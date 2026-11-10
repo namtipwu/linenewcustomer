@@ -204,7 +204,7 @@
 <script>
 /* ====== ตั้งค่า (แก้ตรงนี้) ====== */
 const CONFIG = {
-  LIFF_ID: '2012527876-GnQmlP9n',           // ใส่ LIFF ID ที่ได้จาก LINE Developers Console
+  LIFF_ID: '2012527876-GnQmlP9n',          // ใส่ LIFF ID ที่ได้จาก LINE Developers Console
   SEND_TEXT_COPY: true,              // ส่งข้อความตัวอักษรตามหลังการ์ด เพื่อให้เจ้าหน้าที่คัดลอกชื่อ/HN ได้
   CLOSE_AFTER_MS: 2500,              // ปิดหน้าฟอร์มอัตโนมัติหลังส่งสำเร็จ (0 = ไม่ปิด)
   // วันออกตรวจ: 1=จันทร์ 2=อังคาร 3=พุธ 4=พฤหัสบดี 5=ศุกร์
@@ -229,13 +229,20 @@ const $ = (id) => document.getElementById(id);
 let type = null, view = 'type', data = null, liffReady = false, sending = false;
 
 /* ---------- LIFF ---------- */
+function demo(reason){
+  $('demo').hidden = false;
+  $('demo').textContent = 'โหมดทดลอง (ยังไม่ส่งเข้าแชท) — สาเหตุ: ' + reason;
+}
 async function initLiff(){
-  if (!window.liff || !CONFIG.LIFF_ID || CONFIG.LIFF_ID === '2012527876-GnQmlP9n') { $('demo').hidden = false; return; }
+  if (!window.liff) return demo('โหลด LIFF SDK ไม่ได้ (ตรวจอินเทอร์เน็ต)');
+  if (!CONFIG.LIFF_ID || CONFIG.LIFF_ID === 'YOUR-LIFF-ID') return demo('ยังไม่ได้ใส่ LIFF ID ในไฟล์');
   try {
     await liff.init({ liffId: CONFIG.LIFF_ID });
-    liffReady = liff.isInClient();
-    if (!liffReady) $('demo').hidden = false;
-  } catch (e) { $('demo').hidden = false; }
+  } catch (e) {
+    return demo('liff.init ล้มเหลว — ตรวจ LIFF ID และ Endpoint URL (' + (e && e.message ? e.message : e) + ')');
+  }
+  if (!liff.isInClient()) return demo('เปิดในเบราว์เซอร์ ไม่ได้เปิดในแอป LINE — ต้องกดลิงก์ liff.line.me จากห้องแชท OA บนมือถือ');
+  liffReady = true;
 }
 
 /* ---------- เตรียมฟอร์ม ---------- */
