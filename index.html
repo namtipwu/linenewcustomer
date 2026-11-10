@@ -88,6 +88,9 @@
   .picked{margin:8px 0 0;font-weight:600;color:var(--purple-700)}
   .info{margin:0;padding:12px 14px;border-radius:12px;background:var(--purple-100);color:var(--purple-900);font-size:15px}
   .field.bad .cal{border-color:var(--danger)}
+  .tick{display:flex;align-items:center;gap:10px;margin:8px 0 0;min-height:44px;font-size:16px;color:var(--muted);cursor:pointer;width:fit-content}
+  .tick input{width:22px;height:22px;margin:0;accent-color:var(--purple-700)}
+  input:disabled,select:disabled{opacity:.5}
   [hidden]{display:none !important}
 </style>
 </head>
@@ -123,11 +126,14 @@
     <div class="field" data-f="name"><label for="o-name">ชื่อ-นามสกุล <span class="req">*</span></label>
       <input id="o-name" type="text" autocomplete="name" maxlength="80"><p class="err">กรุณากรอกชื่อ-นามสกุล</p></div>
     <div class="field" data-f="hn"><label for="o-hn">HN <span class="req">*</span></label>
-      <input id="o-hn" type="text" inputmode="numeric" maxlength="20"><p class="err">กรุณากรอก HN</p></div>
+      <input id="o-hn" type="text" inputmode="numeric" maxlength="20">
+      <label class="tick"><input type="checkbox" id="o-hn-unk"><span>ไม่ทราบ HN</span></label>
+      <p class="err">กรุณากรอก HN หรือติ๊ก "ไม่ทราบ HN"</p></div>
     <div class="field" data-f="doctor"><label for="o-doctor">แพทย์เจ้าของไข้เดิม <span class="req">*</span></label>
       <select id="o-doctor"></select>
       <input id="o-doctor-other" type="text" maxlength="60" placeholder="ระบุชื่อแพทย์" style="margin-top:8px" hidden>
-      <p class="err">กรุณาเลือกหรือระบุแพทย์</p></div>
+      <label class="tick"><input type="checkbox" id="o-doc-unk"><span>ไม่ทราบแพทย์เจ้าของไข้</span></label>
+      <p class="err">กรุณาเลือกแพทย์ หรือติ๊ก "ไม่ทราบแพทย์เจ้าของไข้"</p></div>
     <div class="field" data-f="need"><span class="lbl" id="o-need-l">ต้องการ <span class="req">*</span></span>
       <div class="pills" role="radiogroup" aria-labelledby="o-need-l">
         <label><input type="radio" name="o-need" value="เลื่อนนัด"><span>เลื่อนนัด</span></label>
@@ -252,6 +258,15 @@ sel.innerHTML = '<option value="">— เลือกแพทย์ —</option
   '<option value="__other">อื่น ๆ</option>';
 sel.addEventListener('change', () => { $('o-doctor-other').hidden = sel.value !== '__other'; renderCal(); });
 document.querySelectorAll('input[name="o-need"]').forEach(r => r.addEventListener('change', renderCal));
+$('o-hn-unk').addEventListener('change', e => {
+  $('o-hn').disabled = e.target.checked;
+  if (e.target.checked) { $('o-hn').value = ''; $('v-old').querySelector('[data-f="hn"]').classList.remove('bad'); }
+});
+$('o-doc-unk').addEventListener('change', e => {
+  sel.disabled = e.target.checked;
+  if (e.target.checked) { sel.value = ''; $('o-doctor-other').hidden = true; $('v-old').querySelector('[data-f="doctor"]').classList.remove('bad'); }
+  renderCal();
+});
 
 const DAY_TH = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
 const DOW_SHORT = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
@@ -262,9 +277,9 @@ const cal = { y: tomorrow.getFullYear(), m: tomorrow.getMonth(), selected: null,
 /* ---------- ปฏิทินเลือกวัน ---------- */
 function currentNeed(){ return (document.querySelector('input[name="o-need"]:checked') || {}).value; }
 function dateRule(){
-  const need = currentNeed(), v = sel.value;
-  if (!need || v === '') return { mode: 'wait' };
-  if (need === 'รับยาเดิม' || v === '__other') return { mode: 'pick', days: CONFIG.WEEKDAYS };
+  const need = currentNeed(), v = sel.value, docUnk = $('o-doc-unk').checked;
+  if (!need || (v === '' && !docUnk)) return { mode: 'wait' };
+  if (need === 'รับยาเดิม' || v === '__other' || docUnk) return { mode: 'pick', days: CONFIG.WEEKDAYS };
   const doc = CONFIG.DOCTORS[Number(v)];
   if (!doc.days) return { mode: 'staff', note: doc.note };
   return { mode: 'pick', days: doc.days };
@@ -280,7 +295,7 @@ function renderCal(){
   if (r.mode === 'staff') { info.textContent = r.note || 'เจ้าหน้าที่จะแจ้งวันนัดให้ทราบ'; cal.selected = null; }
   if (r.mode === 'pick') {
     const names = r.days.map(d => DAY_TH[d]);
-    hint.textContent = currentNeed() === 'รับยาเดิม' || sel.value === '__other'
+    hint.textContent = currentNeed() === 'รับยาเดิม' || sel.value === '__other' || $('o-doc-unk').checked
       ? 'เลือกได้ทุกวันจันทร์–ศุกร์'
       : 'แพทย์ท่านนี้ออกตรวจวัน' + names.join(' และ ') + ' เลือกได้เฉพาะวันดังกล่าว';
     if (cal.selected && !r.days.includes(cal.selected.getDay())) cal.selected = null;
@@ -350,19 +365,21 @@ function collect(){
   const v = (id) => $(id).value.trim();
   if (type === 'old') {
     const name = v('o-name'), hn = v('o-hn');
-    const doctor = sel.value === '' ? '' : sel.value === '__other'
+    const hnUnk = $('o-hn-unk').checked;
+    const doctor = $('o-doc-unk').checked ? 'ไม่ทราบ'
+      : sel.value === '' ? '' : sel.value === '__other'
       ? (v('o-doctor-other') ? 'อื่น ๆ: ' + v('o-doctor-other') : 'อื่น ๆ (ไม่ระบุชื่อ)')
       : CONFIG.DOCTORS[Number(sel.value)].name;
     const need = currentNeed();
     ok = mark(form, 'name', !!name) & ok;
-    ok = mark(form, 'hn', !!hn) & ok;
+    ok = mark(form, 'hn', !!hn || hnUnk) & ok;
     ok = mark(form, 'doctor', !!doctor) & ok;
     ok = mark(form, 'need', !!need) & ok;
     ok = mark(form, 'date', cal.mode === 'staff' || (cal.mode === 'pick' && !!cal.selected)) & ok;
     if (!ok) return focusFirstBad(form);
     const dateText = cal.mode === 'staff' ? 'ให้เจ้าหน้าที่แจ้งวันออกตรวจ' : thaiDate(cal.selected);
     return { type: 'old', rows: [
-      ['ชื่อ-นามสกุล', name], ['HN', hn], ['แพทย์เจ้าของไข้เดิม', doctor],
+      ['ชื่อ-นามสกุล', name], ['HN', hnUnk ? 'ไม่ทราบ' : hn], ['แพทย์เจ้าของไข้เดิม', doctor],
       ['ต้องการ', need], ['วันที่ต้องการนัด', dateText]
     ], name };
   } else {
