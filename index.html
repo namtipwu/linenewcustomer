@@ -74,6 +74,20 @@
   .flex .b span:nth-child(odd){color:var(--muted)}
   .flex .b span:nth-child(even){font-weight:600;white-space:pre-line}
   .flex .f{background:#F3EDFA;color:#5B3A8E;font-size:13px;padding:10px 16px}
+  .cal{border:1.5px solid var(--line);border-radius:14px;padding:10px;background:var(--purple-50)}
+  .cal-h{display:flex;align-items:center;justify-content:space-between;margin:0 0 6px}
+  .cal-h b{font-family:'Prompt',sans-serif;font-weight:600;color:var(--purple-900)}
+  .cal-nav{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:0;border-radius:22px;background:transparent;color:var(--purple-700);cursor:pointer}
+  .cal-nav:disabled{opacity:.3;cursor:default}
+  .cal-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;text-align:center}
+  .cal-g .dow{font-size:13px;color:var(--muted);padding:4px 0}
+  .cal-g button{font:inherit;min-height:44px;border:0;border-radius:10px;background:#fff;color:var(--ink);font-weight:600;cursor:pointer;padding:0}
+  .cal-g button:disabled{background:transparent;color:#B9AFC8;font-weight:400;cursor:default}
+  .cal-g button.sel{background:var(--purple-700);color:#fff}
+  .cal-g button:focus-visible,.cal-nav:focus-visible{outline:3px solid var(--purple-500);outline-offset:1px}
+  .picked{margin:8px 0 0;font-weight:600;color:var(--purple-700)}
+  .info{margin:0;padding:12px 14px;border-radius:12px;background:var(--purple-100);color:var(--purple-900);font-size:15px}
+  .field.bad .cal{border-color:var(--danger)}
   [hidden]{display:none !important}
 </style>
 </head>
@@ -114,13 +128,24 @@
       <select id="o-doctor"></select>
       <input id="o-doctor-other" type="text" maxlength="60" placeholder="ระบุชื่อแพทย์" style="margin-top:8px" hidden>
       <p class="err">กรุณาเลือกหรือระบุแพทย์</p></div>
-    <div class="field" data-f="date"><label for="o-date">วันที่ต้องการนัด <span class="req">*</span></label>
-      <input id="o-date" type="date"><p class="err" id="o-date-err">กรุณาเลือกวันที่</p></div>
     <div class="field" data-f="need"><span class="lbl" id="o-need-l">ต้องการ <span class="req">*</span></span>
       <div class="pills" role="radiogroup" aria-labelledby="o-need-l">
         <label><input type="radio" name="o-need" value="เลื่อนนัด"><span>เลื่อนนัด</span></label>
         <label><input type="radio" name="o-need" value="รับยาเดิม"><span>รับยาเดิม</span></label>
       </div><p class="err">กรุณาเลือก 1 ข้อ</p></div>
+    <div class="field" data-f="date"><span class="lbl" id="o-date-l">วันที่ต้องการนัด <span class="req">*</span></span>
+      <p class="hint" id="o-date-hint" style="margin:0 0 8px">กรุณาเลือกแพทย์และสิ่งที่ต้องการก่อน</p>
+      <div class="cal" id="cal" hidden aria-labelledby="o-date-l">
+        <div class="cal-h">
+          <button type="button" class="cal-nav" id="cal-prev" aria-label="เดือนก่อนหน้า"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></button>
+          <b id="cal-title"></b>
+          <button type="button" class="cal-nav" id="cal-next" aria-label="เดือนถัดไป"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></button>
+        </div>
+        <div class="cal-g" id="cal-grid"></div>
+      </div>
+      <p class="picked" id="cal-picked" hidden></p>
+      <p class="info" id="o-date-info" hidden></p>
+      <p class="err">กรุณาเลือกวันที่จากปฏิทิน</p></div>
   </form>
 
   <!-- 2b. ฟอร์มผู้ป่วยใหม่ -->
@@ -182,16 +207,20 @@ const CONFIG = {
   LIFF_ID: 'YOUR-LIFF-ID',           // ใส่ LIFF ID ที่ได้จาก LINE Developers Console
   SEND_TEXT_COPY: true,              // ส่งข้อความตัวอักษรตามหลังการ์ด เพื่อให้เจ้าหน้าที่คัดลอกชื่อ/HN ได้
   CLOSE_AFTER_MS: 2500,              // ปิดหน้าฟอร์มอัตโนมัติหลังส่งสำเร็จ (0 = ไม่ปิด)
+  // วันออกตรวจ: 1=จันทร์ 2=อังคาร 3=พุธ 4=พฤหัสบดี 5=ศุกร์
+  // days: null = ไม่มีวันประจำ (ผู้ป่วยไม่ต้องเลือกวันเมื่อเลื่อนนัด เจ้าหน้าที่จะแจ้งวันให้)
   DOCTORS: [
-    'พญ.ศันสนีย์ นิชู',
-    'นพ.ทรงภูมิ เบญญากร',
-    'นพ.กฤติศักดิ์ อนุโรจน์',
-    'พญ.น้ำทิพย์ หวังวิวัฒน์เจริญ',
-    'นพ.ธนวิศว์ จำเนียรกาล',
-    'นพ.ดีพร้อม ศิริเขต',
-    'นพ.ศิวัตร จงบัญญัติเจริญ',
-    'อายุรแพทย์ผู้สูงอายุ (แผนกอายุรกรรม)'
+    { name: 'พญ.ศันสนีย์ นิชู',              days: [1, 3] },
+    { name: 'นพ.ทรงภูมิ เบญญากร',            days: [2, 5] },
+    { name: 'นพ.กฤติศักดิ์ อนุโรจน์',          days: [1, 3] },
+    { name: 'พญ.น้ำทิพย์ หวังวิวัฒน์เจริญ',     days: [3, 5] },
+    { name: 'นพ.ธนวิศว์ จำเนียรกาล',          days: [2, 4] },
+    { name: 'นพ.ดีพร้อม ศิริเขต',             days: [4, 5] },
+    { name: 'นพ.ศิวัตร จงบัญญัติเจริญ',        days: [1, 3] },
+    { name: 'รศ.พญ.วันเพ็ญ ธุรกิตต์วัณณการ',   days: null, note: 'ออกตรวจวันอังคาร เดือนละ 1 ครั้ง เจ้าหน้าที่จะตรวจสอบตารางและแจ้งวันนัดให้ทราบ' }
   ],
+  WEEKDAYS: [1, 2, 3, 4, 5],          // วันที่รับยาเดิมได้ / ผู้ป่วยเลือก "อื่น ๆ"
+  BOOK_AHEAD_DAYS: 90,               // เลือกวันล่วงหน้าได้ไม่เกินกี่วัน
   CARD_FOOTER: 'ได้รับข้อมูลแล้ว เจ้าหน้าที่จะตรวจสอบคิวและตอบกลับในเวลาทำการ'
 };
 /* ================================= */
@@ -212,12 +241,71 @@ async function initLiff(){
 /* ---------- เตรียมฟอร์ม ---------- */
 const sel = $('o-doctor');
 sel.innerHTML = '<option value="">— เลือกแพทย์ —</option>' +
-  CONFIG.DOCTORS.map(d => `<option>${esc(d)}</option>`).join('') +
-  '<option value="__other">อื่น ๆ / ไม่ทราบชื่อ</option>';
-sel.addEventListener('change', () => { $('o-doctor-other').hidden = sel.value !== '__other'; });
+  CONFIG.DOCTORS.map((d, i) => `<option value="${i}">${esc(d.name)}</option>`).join('') +
+  '<option value="__other">อื่น ๆ</option>';
+sel.addEventListener('change', () => { $('o-doctor-other').hidden = sel.value !== '__other'; renderCal(); });
+document.querySelectorAll('input[name="o-need"]').forEach(r => r.addEventListener('change', renderCal));
 
-const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-$('o-date').min = isoDate(tomorrow);
+const DAY_TH = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+const DOW_SHORT = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+const tomorrow = new Date(); tomorrow.setHours(0, 0, 0, 0); tomorrow.setDate(tomorrow.getDate() + 1);
+const lastDay = new Date(tomorrow); lastDay.setDate(lastDay.getDate() + CONFIG.BOOK_AHEAD_DAYS);
+const cal = { y: tomorrow.getFullYear(), m: tomorrow.getMonth(), selected: null, mode: 'wait', days: [] };
+
+/* ---------- ปฏิทินเลือกวัน ---------- */
+function currentNeed(){ return (document.querySelector('input[name="o-need"]:checked') || {}).value; }
+function dateRule(){
+  const need = currentNeed(), v = sel.value;
+  if (!need || v === '') return { mode: 'wait' };
+  if (need === 'รับยาเดิม' || v === '__other') return { mode: 'pick', days: CONFIG.WEEKDAYS };
+  const doc = CONFIG.DOCTORS[Number(v)];
+  if (!doc.days) return { mode: 'staff', note: doc.note };
+  return { mode: 'pick', days: doc.days };
+}
+function renderCal(){
+  const r = dateRule();
+  cal.mode = r.mode; cal.days = r.days || [];
+  const hint = $('o-date-hint'), info = $('o-date-info');
+  $('cal').hidden = r.mode !== 'pick';
+  hint.hidden = r.mode === 'staff';
+  info.hidden = r.mode !== 'staff';
+  if (r.mode === 'wait') { hint.textContent = 'กรุณาเลือกแพทย์และสิ่งที่ต้องการก่อน'; cal.selected = null; }
+  if (r.mode === 'staff') { info.textContent = r.note || 'เจ้าหน้าที่จะแจ้งวันนัดให้ทราบ'; cal.selected = null; }
+  if (r.mode === 'pick') {
+    const names = r.days.map(d => DAY_TH[d]);
+    hint.textContent = currentNeed() === 'รับยาเดิม' || sel.value === '__other'
+      ? 'เลือกได้ทุกวันจันทร์–ศุกร์'
+      : 'แพทย์ท่านนี้ออกตรวจวัน' + names.join(' และ ') + ' เลือกได้เฉพาะวันดังกล่าว';
+    if (cal.selected && !r.days.includes(cal.selected.getDay())) cal.selected = null;
+    drawMonth();
+  }
+  $('cal-picked').hidden = !(r.mode === 'pick' && cal.selected);
+  if (cal.selected) $('cal-picked').textContent = 'วันที่เลือก: ' + thaiDate(cal.selected);
+  if (r.mode !== 'wait') $('v-old').querySelector('[data-f="date"]').classList.remove('bad');
+}
+function drawMonth(){
+  const first = new Date(cal.y, cal.m, 1);
+  $('cal-title').textContent = first.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
+  $('cal-prev').disabled = cal.y === tomorrow.getFullYear() && cal.m === tomorrow.getMonth();
+  $('cal-next').disabled = cal.y === lastDay.getFullYear() && cal.m === lastDay.getMonth();
+  let html = DOW_SHORT.map(d => `<span class="dow">${d}</span>`).join('');
+  for (let i = 0; i < first.getDay(); i++) html += '<span></span>';
+  const n = new Date(cal.y, cal.m + 1, 0).getDate();
+  for (let day = 1; day <= n; day++) {
+    const d = new Date(cal.y, cal.m, day);
+    const ok = d >= tomorrow && d <= lastDay && cal.days.includes(d.getDay());
+    const isSel = cal.selected && d.getTime() === cal.selected.getTime();
+    html += `<button type="button" data-d="${day}" ${ok ? '' : 'disabled'} class="${isSel ? 'sel' : ''}" aria-label="${esc(thaiDate(d))}"${isSel ? ' aria-pressed="true"' : ''}>${day}</button>`;
+  }
+  $('cal-grid').innerHTML = html;
+}
+$('cal-grid').addEventListener('click', e => {
+  const b = e.target.closest('button[data-d]'); if (!b || b.disabled) return;
+  cal.selected = new Date(cal.y, cal.m, Number(b.dataset.d));
+  renderCal();
+});
+$('cal-prev').addEventListener('click', () => { if (--cal.m < 0) { cal.m = 11; cal.y--; } drawMonth(); });
+$('cal-next').addEventListener('click', () => { if (++cal.m > 11) { cal.m = 0; cal.y++; } drawMonth(); });
 $('n-topic').addEventListener('input', e => { $('n-topic-c').textContent = e.target.value.length; });
 
 document.querySelectorAll('[data-type]').forEach(b => b.addEventListener('click', () => {
@@ -255,25 +343,20 @@ function collect(){
   const v = (id) => $(id).value.trim();
   if (type === 'old') {
     const name = v('o-name'), hn = v('o-hn');
-    let doctor = sel.value === '__other' ? (v('o-doctor-other') || 'ไม่ทราบชื่อ') : sel.value;
-    const dateStr = $('o-date').value;
-    const need = (form.querySelector('input[name="o-need"]:checked') || {}).value;
+    const doctor = sel.value === '' ? '' : sel.value === '__other'
+      ? (v('o-doctor-other') ? 'อื่น ๆ: ' + v('o-doctor-other') : 'อื่น ๆ (ไม่ระบุชื่อ)')
+      : CONFIG.DOCTORS[Number(sel.value)].name;
+    const need = currentNeed();
     ok = mark(form, 'name', !!name) & ok;
     ok = mark(form, 'hn', !!hn) & ok;
     ok = mark(form, 'doctor', !!doctor) & ok;
-    let dateOk = !!dateStr, msg = 'กรุณาเลือกวันที่';
-    if (dateStr) {
-      const d = new Date(dateStr + 'T00:00:00');
-      if (d < new Date(isoDate(tomorrow) + 'T00:00:00')) { dateOk = false; msg = 'กรุณาเลือกวันที่ตั้งแต่พรุ่งนี้เป็นต้นไป'; }
-      else if (d.getDay() === 0 || d.getDay() === 6) { dateOk = false; msg = 'คลินิกเปิดวันจันทร์–ศุกร์ กรุณาเลือกวันทำการ'; }
-    }
-    $('o-date-err').textContent = msg;
-    ok = mark(form, 'date', dateOk) & ok;
     ok = mark(form, 'need', !!need) & ok;
+    ok = mark(form, 'date', cal.mode === 'staff' || (cal.mode === 'pick' && !!cal.selected)) & ok;
     if (!ok) return focusFirstBad(form);
+    const dateText = cal.mode === 'staff' ? 'ให้เจ้าหน้าที่แจ้งวันออกตรวจ' : thaiDate(cal.selected);
     return { type: 'old', rows: [
       ['ชื่อ-นามสกุล', name], ['HN', hn], ['แพทย์เจ้าของไข้เดิม', doctor],
-      ['วันที่ต้องการนัด', thaiDate(dateStr)], ['ต้องการ', need]
+      ['ต้องการ', need], ['วันที่ต้องการนัด', dateText]
     ], name };
   } else {
     const name = v('n-name'), hn = v('n-hn'), age = v('n-age'), topic = v('n-topic');
@@ -367,7 +450,7 @@ function showPreview(d){
 /* ---------- เครื่องมือ ---------- */
 function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function isoDate(d){ const z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`; }
-function thaiDate(s){ return new Date(s + 'T00:00:00').toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
+function thaiDate(s){ return (s instanceof Date ? s : new Date(s + 'T00:00:00')).toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
 
 initLiff();
 go('type');
