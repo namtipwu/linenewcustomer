@@ -204,7 +204,7 @@
 <script>
 /* ====== ตั้งค่า (แก้ตรงนี้) ====== */
 const CONFIG = {
-  LIFF_ID: 'YOUR-LIFF-ID',           // ใส่ LIFF ID ที่ได้จาก LINE Developers Console
+  LIFF_ID: '2012527876-GnQmlP9n',           // ใส่ LIFF ID ที่ได้จาก LINE Developers Console
   SEND_TEXT_COPY: true,              // ส่งข้อความตัวอักษรตามหลังการ์ด เพื่อให้เจ้าหน้าที่คัดลอกชื่อ/HN ได้
   CLOSE_AFTER_MS: 2500,              // ปิดหน้าฟอร์มอัตโนมัติหลังส่งสำเร็จ (0 = ไม่ปิด)
   // วันออกตรวจ: 1=จันทร์ 2=อังคาร 3=พุธ 4=พฤหัสบดี 5=ศุกร์
@@ -230,7 +230,7 @@ let type = null, view = 'type', data = null, liffReady = false, sending = false;
 
 /* ---------- LIFF ---------- */
 async function initLiff(){
-  if (!window.liff || !CONFIG.LIFF_ID || CONFIG.LIFF_ID === 'YOUR-LIFF-ID') { $('demo').hidden = false; return; }
+  if (!window.liff || !CONFIG.LIFF_ID || CONFIG.LIFF_ID === '2012527876-GnQmlP9n') { $('demo').hidden = false; return; }
   try {
     await liff.init({ liffId: CONFIG.LIFF_ID });
     liffReady = liff.isInClient();
